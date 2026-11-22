@@ -193,58 +193,99 @@ const mockUsers = [
   }
 ];
 
+// Helper to wrap results with chainable mongoose-like query methods
+function wrapQuery(result) {
+  const promise = Promise.resolve(result);
+  promise.select = function() { return wrapQuery(result); };
+  promise.sort = function(sortObj) {
+    if (Array.isArray(result) && sortObj) {
+      const key = Object.keys(sortObj)[0];
+      const dir = sortObj[key];
+      const sorted = [...result].sort((a, b) => {
+        if (a[key] < b[key]) return dir === -1 ? 1 : -1;
+        if (a[key] > b[key]) return dir === -1 ? -1 : 1;
+        return 0;
+      });
+      return wrapQuery(sorted);
+    }
+    return wrapQuery(result);
+  };
+  promise.populate = function() { return wrapQuery(result); };
+  return promise;
+}
+
 // Mock User model
 class MockUser {
-  static async findOne(query) {
-    // Handle username query
-    if (query.username) {
+  static findOne(query = {}) {
+    let match = null;
+
+    if (query.role) {
+      match = mockUsers.find(user => user.role === query.role);
+    } else if (query.username) {
       const username = query.username.$regex
         ? query.username.$regex.source.replace('^', '').replace('$', '')
         : query.username;
-
-      return mockUsers.find(user =>
+      match = mockUsers.find(user =>
         user.username.toLowerCase() === username.toLowerCase()
       );
-    }
-
-    // Handle rollNumber query for student login
-    if (query.rollNumber) {
+    } else if (query.rollNumber) {
       const rollNumber = query.rollNumber.$regex
         ? query.rollNumber.$regex.source.replace('^', '').replace('$', '')
         : query.rollNumber;
-
-      // If role is specified, check that too
       if (query.role) {
-        return mockUsers.find(user =>
+        match = mockUsers.find(user =>
           user.rollNumber &&
           user.rollNumber.toLowerCase() === rollNumber.toLowerCase() &&
           user.role === query.role
         );
+      } else {
+        match = mockUsers.find(user =>
+          user.rollNumber &&
+          user.rollNumber.toLowerCase() === rollNumber.toLowerCase()
+        );
       }
-
-      return mockUsers.find(user =>
-        user.rollNumber &&
-        user.rollNumber.toLowerCase() === rollNumber.toLowerCase()
-      );
+    } else if (query._id) {
+      match = mockUsers.find(user => user._id === query._id);
     }
 
-    // Handle ID query
-    if (query._id) {
-      return mockUsers.find(user => user._id === query._id);
-    }
-
-    return null;
+    return wrapQuery(match ? { ...match } : null);
   }
 
-  static async findById(id) {
-    return mockUsers.find(user => user._id === id);
+  static findById(id) {
+    const match = mockUsers.find(user => user._id === id);
+    return wrapQuery(match ? { ...match } : null);
   }
 
-  static async find(query = {}) {
+  static find(query = {}) {
+    let list = [...mockUsers];
     if (query.role) {
-      return mockUsers.filter(user => user.role === query.role);
+      list = list.filter(user => user.role === query.role);
     }
-    return [...mockUsers];
+    return wrapQuery(list.map(u => ({ ...u })));
+  }
+
+  constructor(data = {}) {
+    this._id = data._id || 'mock_' + Math.random().toString(36).substring(2, 10);
+    this.name = data.name || '';
+    this.username = data.username || '';
+    this.password = data.password || '';
+    this.role = data.role || 'student';
+    this.rollNumber = data.rollNumber || '';
+    this.class = data.class || '';
+    this.branch = data.branch || '';
+    this.email = data.email || '';
+    this.attendance = data.attendance || 0;
+    this.createdAt = new Date();
+    this.updatedAt = new Date();
+  }
+
+  async save() {
+    mockUsers.push(this);
+    return this;
+  }
+
+  toObject() {
+    return { ...this };
   }
 
   static async countDocuments(query = {}) {
@@ -256,27 +297,12 @@ class MockUser {
 
   // Mock comparePassword method
   static async comparePassword(candidatePassword, userPassword) {
-    // For testing purposes, we'll use a simple comparison for specific test passwords
-    if (candidatePassword === '2007' && userPassword.includes('AMM')) {
-      return true; // Allow '2007' password for any mock user with AMM in their password hash
-    }
-    if (candidatePassword === 'admin123' && userPassword.includes('AMMOK')) {
-      return true;
-    }
-    if (candidatePassword === 'teacher123' && userPassword.includes('AMM2K')) {
-      return true;
-    }
-    if (candidatePassword === 'student123' && userPassword.includes('AMM')) {
-      return true; // Allow 'student123' for any student
-    }
-    if (candidatePassword === '1234' && userPassword.includes('AMM9K')) {
-      return true; // Allow '1234' for operator admin
-    }
-    if (candidatePassword === 'developer123' && userPassword.includes('AMM8K')) {
-      return true; // Allow 'developer123' for developer
-    }
-
-    // For other cases, use bcrypt
+    if (candidatePassword === '2007' && userPassword.includes('AMM')) return true;
+    if (candidatePassword === 'admin123' && userPassword.includes('AMMOK')) return true;
+    if (candidatePassword === 'teacher123' && userPassword.includes('AMM2K')) return true;
+    if (candidatePassword === 'student123' && userPassword.includes('AMM')) return true;
+    if (candidatePassword === '1234' && userPassword.includes('AMM9K')) return true;
+    if (candidatePassword === 'developer123' && userPassword.includes('AMM8K')) return true;
     return bcrypt.compare(candidatePassword, userPassword);
   }
 }

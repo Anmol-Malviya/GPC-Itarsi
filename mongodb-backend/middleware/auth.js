@@ -1,8 +1,14 @@
 const jwt = require('jsonwebtoken');
+const { createClerkClient, verifyToken } = require('@clerk/backend');
 const User = require('../models/User');
 const MockUser = require('../models/MockUser');
 const { authCache, userCache, getUserById, cacheUser } = require('../utils/cache');
 const { measureExecutionTime, recordTokenVerification } = require('../utils/performance');
+
+const clerkClient = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY
+});
 
 // Always use the real User model since we're connected to MongoDB Atlas
 const UserModel = User;
@@ -61,7 +67,41 @@ const authenticateToken = async (req, res, next) => {
         console.log('Attempting to verify JWT token with secret');
       }
 
-      decoded = jwt.verify(cleanToken, process.env.JWT_SECRET || 'your-jwt-secret-key');
+      let isClerk = false;
+
+      // Check if this is a Clerk session token
+      if (cleanToken.startsWith('sess_') || cleanToken.split('.').length === 3) {
+        try {
+          const clerkSession = await verifyToken(cleanToken, {
+            secretKey: process.env.CLERK_SECRET_KEY,
+          });
+          if (clerkSession && (clerkSession.sub || clerkSession.userId)) {
+            const clerkUserId = clerkSession.sub || clerkSession.userId;
+            const clerkUser = await clerkClient.users.getUser(clerkUserId);
+            const role = clerkUser.publicMetadata?.role || 'student';
+            const primaryEmail = clerkUser.emailAddresses?.find(e => e.id === clerkUser.primaryEmailAddressId)?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '';
+            const fullName = `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || clerkUser.username || 'User';
+
+            decoded = {
+              id: clerkUserId,
+              _id: clerkUserId,
+              clerkId: clerkUserId,
+              username: clerkUser.username || primaryEmail || clerkUserId,
+              role: role,
+              name: fullName,
+              email: primaryEmail,
+              isClerk: true
+            };
+            isClerk = true;
+          }
+        } catch (clerkErr) {
+          // Fall back to standard JWT verification below
+        }
+      }
+
+      if (!isClerk) {
+        decoded = jwt.verify(cleanToken, process.env.JWT_SECRET || 'your-jwt-secret-key');
+      }
 
       verificationTime = performance.now() - verificationStart;
 
@@ -81,7 +121,12 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Get the user from cache or database
-    if (decoded && decoded.id) {
+    if (decoded && decoded.isClerk) {
+      req.user = decoded;
+      if (!isCommonPath) {
+        console.log('Clerk User set in request:', req.user.id, 'with role:', req.user.role);
+      }
+    } else if (decoded && decoded.id) {
       let user;
       const userId = decoded.id;
 

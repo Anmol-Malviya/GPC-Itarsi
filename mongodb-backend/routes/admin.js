@@ -252,7 +252,7 @@ router.delete('/delete-teacher/:id', authenticateToken, authorize(['admin']), as
 // Add a new student (admin only)
 router.post('/add-student', authenticateToken, authorize(['admin']), async (req, res) => {
   try {
-    const { name, rollNumber, className, password, branch } = req.body;
+    const { name, rollNumber, className, password, branch, email: providedEmail } = req.body;
 
     if (!name || !rollNumber || !className || !branch) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -270,10 +270,9 @@ router.post('/add-student', authenticateToken, authorize(['admin']), async (req,
       return res.status(400).json({ message: 'Roll number already exists' });
     }
 
-    // Generate a unique email for the student based on roll number
-    // Sanitize roll number for email (remove any characters that might not be valid in an email)
+    // Use provided Gmail/email if given, otherwise generate college email
     const sanitizedRollNumber = rollNumber.toLowerCase().replace(/[^a-zA-Z0-9._-]/g, '');
-    const email = `${sanitizedRollNumber}@gpc-itarsi.edu.in`;
+    const email = (providedEmail && providedEmail.trim()) ? providedEmail.trim().toLowerCase() : `${sanitizedRollNumber}@gpc-itarsi.edu.in`;
 
     // Check if email already exists
     const existingEmail = await User.findOne({ email });

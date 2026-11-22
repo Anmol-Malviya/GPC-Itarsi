@@ -199,6 +199,20 @@ router.get('/me', authenticateToken, async (req, res) => {
   const startTime = performance.now();
 
   try {
+    if (req.user && req.user.isClerk) {
+      return res.json({
+        user: {
+          _id: req.user.id,
+          id: req.user.id,
+          username: req.user.username,
+          name: req.user.name,
+          role: req.user.role,
+          email: req.user.email,
+          profilePicture: '',
+          profileComplete: true
+        }
+      });
+    }
     // User data should already be in req.user from the authenticateToken middleware
     // which now uses caching, so we can just return that data directly in most cases
 

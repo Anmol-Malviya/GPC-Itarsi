@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext } from 'react';
+import { useUser, useAuth as useClerkAuth, useClerk } from '@clerk/react';
 import axios from 'axios';
 import config from '../config';
 
@@ -7,14 +8,59 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
+  const { user: clerkUser, isLoaded: isClerkLoaded, isSignedIn: isClerkSignedIn } = useUser();
+  const { getToken, signOut: clerkSignOut } = useClerkAuth();
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check if user is already logged in
+  // Sync Clerk authentication state
   useEffect(() => {
-    const checkLoggedIn = async () => {
+    const syncClerkUser = async () => {
+      if (!isClerkLoaded) return;
+
+      if (isClerkSignedIn && clerkUser) {
+        try {
+          const clerkToken = await getToken();
+          if (clerkToken) {
+            setToken(clerkToken);
+            localStorage.setItem('token', clerkToken);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${clerkToken}`;
+          }
+
+          const primaryEmail = clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '';
+          const role = clerkUser.publicMetadata?.role || 'student';
+
+          const mappedUser = {
+            id: clerkUser.id,
+            _id: clerkUser.id,
+            clerkId: clerkUser.id,
+            username: clerkUser.username || clerkUser.firstName || primaryEmail || 'User',
+            name: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || clerkUser.username || 'User',
+            email: primaryEmail,
+            role: role,
+            profilePicture: clerkUser.imageUrl,
+            isClerk: true,
+            userData: {
+              role: role,
+              email: primaryEmail
+            }
+          };
+
+          setUser(mappedUser);
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.error('Error syncing Clerk user:', err);
+        }
+      }
+
+      // If not Clerk signed in, fall back to checking custom token in localStorage
+      checkLegacyLoggedIn();
+    };
+
+    const checkLegacyLoggedIn = async () => {
       try {
         const storedToken = localStorage.getItem('token');
 
@@ -108,8 +154,8 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    checkLoggedIn();
-  }, []);
+    syncClerkUser();
+  }, [isClerkLoaded, isClerkSignedIn, clerkUser]);
 
   // Login function
   const login = async (username, password) => {
@@ -223,11 +269,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout function
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    if (isClerkSignedIn) {
+      try {
+        await clerkSignOut();
+      } catch (err) {
+        console.error('Error signing out of Clerk:', err);
+      }
+    }
   };
 
   // Update user profile

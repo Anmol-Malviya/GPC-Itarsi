@@ -15,6 +15,7 @@ const Students = () => {
     name: '',
     rollNumber: '',
     className: '',
+    email: '',
     password: '',
     branch: 'CS' // Default branch
   });
@@ -144,6 +145,7 @@ const Students = () => {
         name: '',
         rollNumber: '',
         className: '',
+        email: '',
         password: '',
         branch: 'CS'
       });
@@ -592,6 +594,22 @@ const Students = () => {
                             value={formData.className}
                             onChange={handleInputChange}
                           />
+                        </div>
+
+                        <div className="admin-form-group">
+                          <label htmlFor="email" className="block text-sm font-medium text-gray-700 admin-form-label">
+                            Email (Gmail)
+                          </label>
+                          <input
+                            type="email"
+                            name="email"
+                            id="email"
+                            placeholder="student@gmail.com"
+                            className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md admin-form-input"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Optional: Enter student's personal or college email address</p>
                         </div>
 
                         <div className="admin-form-group">

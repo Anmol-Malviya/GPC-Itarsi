@@ -73,8 +73,10 @@ const Gallery = () => {
                     src={image.image && image.image.startsWith('http') ? image.image : `${config.apiUrl}/uploads/gallery/${image.image}`}
                     alt={image.title}
                     onError={(e) => {
-                      console.error('Image failed to load:', e.target.src);
-                      e.target.src = 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80';
+                      if (!e.target.dataset.failed) {
+                        e.target.dataset.failed = 'true';
+                        e.target.src = 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1350&q=80';
+                      }
                     }}
                   />
                 </div>
@@ -102,8 +104,10 @@ const Gallery = () => {
                   src={selectedImage.image && selectedImage.image.startsWith('http') ? selectedImage.image : `${config.apiUrl}/uploads/gallery/${selectedImage.image}`}
                   alt={selectedImage.title}
                   onError={(e) => {
-                    console.error('Lightbox image failed to load:', e.target.src);
-                    e.target.src = 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80';
+                    if (!e.target.dataset.failed) {
+                      e.target.dataset.failed = 'true';
+                      e.target.src = 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1350&q=80';
+                    }
                   }}
                 />
                 <button

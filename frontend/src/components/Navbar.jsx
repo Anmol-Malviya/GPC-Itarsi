@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
 import { useAuth } from '../context/AuthContext';
 import { getProfileImageUrl, handleImageError } from '../utils/imageUtils';
 import collegeLogo from '../assets/college-logo.png';
@@ -56,7 +57,26 @@ const Navbar = () => {
               </Link>
             </div>
           </div>
-          <div className="hidden md:flex md:items-center">
+          <div className="hidden md:flex md:items-center space-x-3">
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="px-4 py-2 rounded-md text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer">
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="px-3 py-2 rounded-md text-sm font-medium border border-white/40 hover:bg-white/10 text-white transition-all duration-300 cursor-pointer">
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </Show>
+
+            <Show when="signed-in">
+              <div className="flex items-center space-x-3">
+                <UserButton />
+              </div>
+            </Show>
+
             {isAuthenticated ? (
               <div className="relative ml-3">
                 <div className="flex items-center">
@@ -107,19 +127,7 @@ const Navbar = () => {
                   </div>
                 )}
               </div>
-            ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 rounded-md text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white transition-all duration-300 shadow-sm hover:shadow-md relative overflow-hidden group btn-hover-effect"
-              >
-                <span className="relative z-10 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                  Login
-                </span>
-              </Link>
-            )}
+            ) : null}
           </div>
           <div className="flex items-center md:hidden">
             <button
